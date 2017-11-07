@@ -22,6 +22,8 @@ import io.vertx.core.json.JsonObject;
 public class SmsSender {
 
 	private final static Logger LOG = LogManager.getLogger(SmsSender.class);
+	
+//	This class will do retrieval and sending of messages
 
 	public static final String ACCOUNT_SID = "ACa133e50ad4ad14bee41992f13d4b294a";
 	public static final String AUTH_TOKEN = "7f0be04308cbe2b7dd0f5bf885d86830";
@@ -32,7 +34,31 @@ public class SmsSender {
 		JsonObject status = new JsonObject();
 
 		MessageCreator messageCreator = Message.creator(ACCOUNT_SID, new PhoneNumber(ToPhoneNumber),
-				new PhoneNumber("+14155239121"), "Hi. Your OTP is : " + OTP);
+				new PhoneNumber("+18552775232"), "Hi. Your OTP is : " + OTP);
+
+		try {
+			Message message = messageCreator.create();
+			LOG.info(message.getSid());
+			LOG.info(message.getStatus());
+			status.put("status", "Success");
+			status.put("message", message.getSid());
+			return status;
+		} catch (Exception e) {
+			// TODO: handle exception
+			LOG.error(e.getMessage());
+			status.put("status", "Error");
+			status.put("message", e.getMessage());
+			return status;
+		}
+	}
+	
+	public static JsonObject send(String ToPhoneNumber, String messageBody) {
+
+		Twilio.init(ACCOUNT_SID, AUTH_TOKEN);
+		JsonObject status = new JsonObject();
+
+		MessageCreator messageCreator = Message.creator(ACCOUNT_SID, new PhoneNumber(ToPhoneNumber),
+				new PhoneNumber("+18552775232"), messageBody);
 
 		try {
 			Message message = messageCreator.create();
@@ -61,6 +87,7 @@ public class SmsSender {
 		Message message = messageFetcher.fetch();
 		results.put("date", message.getDateCreated().toString());
 		results.put("messageStatus", message.getStatus());
+		results.put("reason", message.getBody());
 		return results;
 	}
 

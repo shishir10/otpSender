@@ -44,6 +44,7 @@ public class ServerVerticle extends AbstractVerticle {
 		router.route().handler(CorsHandler.create("*").allowedMethod(HttpMethod.GET).allowedMethod(HttpMethod.POST)
 				.allowedMethod(HttpMethod.OPTIONS).allowedHeader("Authorization").allowedHeader("Content-Type"));
 		
+//		Routing all the requests to this handler
 		router.mountSubRouter("/event/", new EventCapture(vertx));
 
 		vertx.createHttpServer().requestHandler(router::accept).listen(8000, result -> {

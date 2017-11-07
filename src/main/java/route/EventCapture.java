@@ -27,13 +27,75 @@ public class EventCapture extends AbstractRouteHandler {
 	public EventCapture(Vertx vertx) {
 		// TODO Auto-generated constructor stub
 		super(vertx);
+		// Defining all the handlers
 		this.route().handler(BodyHandler.create());
 		this.post("/sendMessage").handler(this::sendMessage);
 		this.post("/saveContact").handler(this::saveContacts);
 		this.post("/getDetails").handler(this::getDetails);
 		this.post("/getAllDetails").handler(this::getAllDetails);
+		this.post("/send").handler(this::send);
+		this.post("/getStatus").handler(this::getStatus);
 	}
-	
+
+	private void getStatus(RoutingContext context) {
+		JsonObject json = new JsonObject();
+		json = context.getBodyAsJson();
+		Connection conn = database.getConnection();
+		String sql = "select * from messages where \"number\" = ?";
+		JsonObject response = new JsonObject();
+		try {
+			PreparedStatement ps = conn.prepareStatement(sql);
+			ps.setString(1, json.getString("number"));
+			ResultSet rs = ps.executeQuery();
+			int i = 0;
+			while (rs.next()) {
+				JsonObject row = new JsonObject();
+				row.put("number", rs.getString(1));
+				JsonObject data = SmsSender.getDetail(rs.getString(2));
+				row.put("messageStatus", data.getString("messageStatus"));
+				row.put("message", data.getString("reason"));
+				row.put("date", data.getString("date"));
+				response.put(String.valueOf(++i), row);
+			}
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			LOG.error(e.getMessage());
+			response.put("status", "error");
+			sendJsonResponse(context, response.toString());
+		}
+		database.close(conn);
+		sendJsonResponse(context, response.toString());
+	}
+
+	private void send(RoutingContext context) {
+		JsonObject json = new JsonObject();
+		json = context.getBodyAsJson();
+		JsonObject status = new JsonObject();
+		String sql = "INSERT INTO public.messages (\"number\", sid) VALUES(?, ?)";
+		String number = json.getString("number");
+		status = SmsSender.send(number, json.getString("message"));
+		if (status.getString("status").equals("Success")) {
+			Connection conn = database.getConnection();
+			PreparedStatement ps;
+			try {
+				ps = conn.prepareStatement(sql);
+				ps.setString(1, number);
+				ps.setString(2, status.getString("message"));
+				ps.execute();
+			} catch (SQLException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+				LOG.error(e.getMessage());
+				status.put("status", "error");
+				status.put("message", e.getMessage());
+			} finally {
+				database.close(conn);
+			}
+		}
+		sendJsonResponse(context, status.toString());
+	}
+
 	private void getAllDetails(RoutingContext context) {
 		Connection conn = database.getConnection();
 		String sql = "select full_name, phone_number, otp_sent from contacts";
@@ -42,7 +104,7 @@ public class EventCapture extends AbstractRouteHandler {
 			PreparedStatement ps = conn.prepareStatement(sql);
 			ResultSet rs = ps.executeQuery();
 			int i = 0;
-			while(rs.next()) {
+			while (rs.next()) {
 				JsonObject row = new JsonObject();
 				row.put("name", rs.getString(1));
 				row.put("number", rs.getString(2));
@@ -59,7 +121,7 @@ public class EventCapture extends AbstractRouteHandler {
 		database.close(conn);
 		sendJsonResponse(context, response.toString());
 	}
-	
+
 	private void getDetails(RoutingContext context) {
 		Connection conn = database.getConnection();
 		String sql = "select * from contacts where otp_sent=true";
@@ -68,7 +130,7 @@ public class EventCapture extends AbstractRouteHandler {
 			PreparedStatement ps = conn.prepareStatement(sql);
 			ResultSet rs = ps.executeQuery();
 			int i = 0;
-			while(rs.next()) {
+			while (rs.next()) {
 				JsonObject row = new JsonObject();
 				row.put("name", rs.getString(1));
 				row.put("number", rs.getString(2));
@@ -95,7 +157,7 @@ public class EventCapture extends AbstractRouteHandler {
 		String sql = "UPDATE public.contacts SET message_sid=?,otp=?,otp_sent=true WHERE phone_number=?";
 		json = routingContext.getBodyAsJson();
 		status = SmsSender.sendMessage(json.getString("number"), json.getInteger("OTP").toString());
-		if(status.getString("status").equals("Success")) {
+		if (status.getString("status").equals("Success")) {
 			Connection conn = database.getConnection();
 			PreparedStatement ps;
 			try {
@@ -115,7 +177,7 @@ public class EventCapture extends AbstractRouteHandler {
 			}
 		}
 		sendJsonResponse(routingContext, status.toString());
-//		LOG.info(json);
+		// LOG.info(json);
 	}
 
 	private void saveContacts(RoutingContext routingContext) {
